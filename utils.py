@@ -12,6 +12,7 @@ RANDOM_CARD = 'Bb'
 RANDOM_CARDS = list(rank + suit for suit in RANDOM_SUITS for rank in RANDOM_RANKS)
 RANDOM_BOARD = [RANDOM_CARD]*5
 RANK_ORDER = {'A':12, 'K':11, 'Q':10, 'J':9, 'T':8, '9':7, '8':6, '7':5, '6':4, '5':3, '4':2, '3':1, '2':0}
+RANKS_ORDERED = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']
 LOW_RANK_ORDER = {'K':12, 'Q':11, 'J':10, 'T':9, '9':8, '8':7, '7':6, '6':5, '5':4, '4':3, '3':2, '2':1,'A':0}
 LOW_CARDS = list("A2345678")
 STRAIGHTS=[list("AKQJT"),list("KQJT9"),list("QJT98"),list("JT987"),list("T9876"),list("98765"),list("87654"),list("76543"),list("65432"),list("5432A")]

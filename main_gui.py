@@ -1200,7 +1200,7 @@ ev_call_4bet_bu.grid(column=3, row=4, sticky=W,padx=BUTTON_PADX)
 ppt_client=OddsOracleServer()
 ppt_queue=Queue()
 ppt_thread=threading.Thread(target=ppt_task_consumer, args=(ppt_queue,))
-ppt_thread.setDaemon(True)
+ppt_thread.daemon = True
 ppt_thread.start()
 
 ppt_queue.put((ppt_client.start_ppt,)) # start PPT Server

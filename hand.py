@@ -25,7 +25,7 @@ from board import *
 import re
 import logging
 import csv
-
+from utils import RANKS_ORDERED
 
 
 def replace_macros(hand, macro_file):
@@ -66,114 +66,175 @@ def parse_hand(hand,board_string):
         logging.error("Cannot open MACRO file")
     else:
         hand = replace_macros(hand,macro_file)
+        hand = expand_plus_notation(hand)
         macro_file.close()
 
     hand = replace_strings(hand,board)
     hand = remove_parentheses(hand)
     return hand
 
-def replace_strings(hand,board):
+def expand_plus_notation(hand):
     """
-    returns string with all + expressions replaced
+    Expands shorthand like QQ+, 22+, A2s+, KTo+ to explicit hand list.
     """
-    ranks=return_ranks(board)
-    ranks_no_count=set(ranks)
-    suits=return_suits(board)
-    flushes=return_flushes(board)
-    straights=return_straights(ranks)
-    fulls_or_better=return_fulls_or_better(ranks)
-    hand_board_int=hand_board_intersections(ranks)
-    str_draws=return_straight_draws(ranks)
-    kickers=return_kicker(ranks)
-    flush_suit=[]
-    if flushes:
-        flush_suit= flush_suit + [flushes[0][1:]]
-    str_flush=return_str_flush(board)
 
-    match_expr=re.compile('['+''.join(RANKS)+']'+'{3,4}'+'\+') #start with longest possible expressions == 3, 4 card wraps
-    hand_sections=match_expr.findall(hand)
 
-    if hand_sections:
-        str_draws=return_straight_draws(ranks)
-        for x in hand_sections:
-            compare_x = ''.join(sorted(x[:-1], key=lambda x:RANK_ORDER[x], reverse=True))
-            if compare_x in str_draws:
-                replace_hands=str_draws[0:str_draws.index(compare_x)+1] # all better draws including written hand
-                hand=hand.replace(x,range_string(replace_hands))
-    
-    match_expr=re.compile('['+''.join(RANKS)+']'+'['+''.join(SUITS)+']'+'{1,2}'+'\+') #flush flushdraw or blocker
-    hand_sections=match_expr.findall(hand)
+    def rank_index(rank):
+        try:
+            return RANKS_ORDERED.index(rank)
+        except ValueError:
+            raise ValueError(f"Invalid rank: {rank}")
 
-    if hand_sections:
-       for x in hand_sections:
-           compare_x=x[0:-1]
-           if len(compare_x) == 2: # can only be blocker...todo exclude flushes? add !suit suit
-               flush_blocker=return_flush_blocker(board)    
-               if compare_x in flush_blocker:
-                   replace_hands=flush_blocker[0:flush_blocker.index(compare_x)+1]
-                   hand=hand.replace(x,range_string(replace_hands))
-           else: # flush or flushdraw
-               if flushes:
-                   flushes=return_flushes(board)
-                   if compare_x in flushes:
-                     replace_hands=fulls_or_better + flushes[0:flushes.index(compare_x)+1]
-                     hand=hand.replace(x,range_string(replace_hands))                     
-                   else:
-                       flush_drw=return_flushdraws(board,compare_x[-1])
-                       if flush_drw:
-                           replace_hands=flush_drw[0:flush_drw.index(compare_x)+1]
-                           hand=hand.replace(x,range_string(replace_hands))                            
+    # Pocket pairs: e.g., QQ+ → QQ, KK, AA
+    def expand_pocket_plus(start_rank):
+        return [r + r for r in RANKS_ORDERED[rank_index(start_rank):]]
 
-    match_expr=re.compile('['+''.join(RANKS)+']'+'{2}'+'\+') #straights, str draws or hand board intersections
-    hand_sections=match_expr.findall(hand)
-    
-    if hand_sections:
-        for x in hand_sections:
-            compare_x=''.join(sorted(x[:-1], key=lambda x:RANK_ORDER[x], reverse=True))
-            
-            if compare_x in fulls_or_better:
-                replace_hands=str_flush+fulls_or_better[0:fulls_or_better.index(compare_x)+1]
-                hand=hand.replace(x,range_string(replace_hands))
-            elif compare_x in straights:
-                replace_hands=str_flush+fulls_or_better+flush_suit+straights[0:straights.index(compare_x)+1]
-                hand=hand.replace(x,range_string(replace_hands))
-            elif compare_x in str_draws:
-                replace_hands=str_draws[0:str_draws.index(compare_x)+1]
-                hand=hand.replace(x,range_string(replace_hands))
-            elif compare_x in hand_board_int:
-                replace_hands=str_flush+fulls_or_better+flush_suit+straights+hand_board_int[0:hand_board_int.index(compare_x)+1]
-                hand=hand.replace(x,range_string(replace_hands))
-            elif x[1] in hand_board_int: # pair + kicker? 
-                replace_hands=hand_board_int[0:hand_board_int.index(x[1])]
-                better_kickers=kickers[0:kickers.index(x[0])+1]
-                replace_hands=str_flush+fulls_or_better+flush_suit+straights+replace_hands+[k+x[1] for k in better_kickers]
-                hand=hand.replace(x,range_string(replace_hands))               
+    # Suited hands: e.g., A2s+ → A2s, A3s, ..., AKs
+    def expand_suited_plus(high_rank, low_rank):
+        start = rank_index(low_rank)
+        return [high_rank + R + 's' for R in RANKS_ORDERED[start:] if R != high_rank]
 
-    match_expr=re.compile('['+''.join(RANKS)+']'+'{1}'+'\+') #one pair or better   
-    hand_sections=match_expr.findall(hand)
+    # Offsuit hands: e.g., KTo+ → KTo, KJo, KQo, etc.
+    def expand_offsuit_plus(high_rank, low_rank):
+        start = rank_index(low_rank)
+        return [high_rank + R + 'o' for R in RANKS_ORDERED[start:] if R != high_rank]
 
-    if hand_sections:
-        for x in hand_sections:
-            compare_x=x[:-1]
-            if compare_x in hand_board_int:
-                replace_hands=str_flush+fulls_or_better+flush_suit+straights+hand_board_int[0:hand_board_int.index(compare_x)+1]
-                hand=hand.replace(x,range_string(replace_hands))
+    # Combo hands without suit: e.g., A2+ → A2, A3, ..., AK
+    def expand_combo_plus(high_rank, low_rank):
+        start = rank_index(low_rank)
+        return [high_rank + R for R in RANKS_ORDERED[start:] if R != high_rank]
 
-    match_expr=re.compile('['+''.join(LOW_CARDS)+']'+'{2}'+'\<') #find HILO hand with < at the end
-    hand_sections=match_expr.findall(hand)
+    import re
+    pocket_pattern = re.compile(r'([2-9TJQKA])\1\+')
+    pattern = re.compile(r'([2-9TJQKA])([2-9TJQKA])(s|o)?\+')
 
-    if hand_sections:
-        low_hands=return_lows(ranks)
-        for x in hand_sections:
-            compare_x=x[:-1]
-            if compare_x in low_hands:
-                replace_hands=low_hands[0:low_hands.index(compare_x)+1]
-                hand=hand.replace(x,range_string(replace_hands))
-    if '+' in hand:
-       logging.error("Could not resolve one or more + expressions in hand:\n{0}".format(hand))
-    if '<' in hand:
-       logging.error("Could not resolve one or more < expressions in hand:\n{0}".format(hand))
+    # Expand pocket pairs
+    for match in pocket_pattern.finditer(hand):
+        start = match.group(1)
+        expanded = ','.join(expand_pocket_plus(start))
+        hand = hand.replace(match.group(0), f"({expanded})")
+
+    # Expand other combos
+    for match in pattern.finditer(hand):
+        hi, lo, suited = match.groups()
+        if suited == 's':
+            expanded = ','.join(expand_suited_plus(hi, lo))
+        elif suited == 'o':
+            expanded = ','.join(expand_offsuit_plus(hi, lo))
+        else:
+            expanded = ','.join(expand_combo_plus(hi, lo))
+        hand = hand.replace(match.group(0), f"({expanded})")
+
     return hand
+
+
+
+def replace_strings(hand, board):
+    """
+    Returns string with all + or < expressions replaced.
+    """
+    ranks = return_ranks(board)
+    ranks_no_count = set(ranks)
+    suits = return_suits(board)
+    flushes = return_flushes(board)
+    straights = return_straights(ranks)
+    fulls_or_better = return_fulls_or_better(ranks)
+    hand_board_int = hand_board_intersections(ranks)
+    str_draws = return_straight_draws(ranks)
+    kickers = return_kicker(ranks)
+    flush_suit = []
+
+    if flushes:
+        flush_suit += [flushes[0][1:]]
+
+    str_flush = return_str_flush(board)
+
+    # 3 to 4 card wraps with +
+    match_expr = re.compile(r'[' + ''.join(RANKS) + r']{3,4}\+')
+    hand_sections = match_expr.findall(hand)
+    if hand_sections:
+        str_draws = return_straight_draws(ranks)
+        for x in hand_sections:
+            compare_x = ''.join(sorted(x[:-1], key=lambda x: RANK_ORDER[x], reverse=True))
+            if compare_x in str_draws:
+                replace_hands = str_draws[:str_draws.index(compare_x)+1]
+                hand = hand.replace(x, range_string(replace_hands))
+
+    # Flush / flushdraw / blocker
+    match_expr = re.compile(r'[' + ''.join(RANKS) + r'][' + ''.join(SUITS) + r']{1,2}\+')
+    hand_sections = match_expr.findall(hand)
+    if hand_sections:
+        for x in hand_sections:
+            compare_x = x[:-1]
+            if len(compare_x) == 2:
+                flush_blocker = return_flush_blocker(board)
+                if compare_x in flush_blocker:
+                    replace_hands = flush_blocker[:flush_blocker.index(compare_x)+1]
+                    hand = hand.replace(x, range_string(replace_hands))
+            else:
+                if flushes:
+                    flushes = return_flushes(board)
+                    if compare_x in flushes:
+                        replace_hands = fulls_or_better + flushes[:flushes.index(compare_x)+1]
+                        hand = hand.replace(x, range_string(replace_hands))
+                    else:
+                        flush_drw = return_flushdraws(board, compare_x[-1])
+                        if flush_drw:
+                            replace_hands = flush_drw[:flush_drw.index(compare_x)+1]
+                            hand = hand.replace(x, range_string(replace_hands))
+
+    # Straights, straight draws, hand/board intersections
+    match_expr = re.compile(r'[' + ''.join(RANKS) + r']{2}\+')
+    hand_sections = match_expr.findall(hand)
+    if hand_sections:
+        for x in hand_sections:
+            compare_x = ''.join(sorted(x[:-1], key=lambda x: RANK_ORDER[x], reverse=True))
+            if compare_x in fulls_or_better:
+                replace_hands = str_flush + fulls_or_better[:fulls_or_better.index(compare_x)+1]
+                hand = hand.replace(x, range_string(replace_hands))
+            elif compare_x in straights:
+                replace_hands = str_flush + fulls_or_better + flush_suit + straights[:straights.index(compare_x)+1]
+                hand = hand.replace(x, range_string(replace_hands))
+            elif compare_x in str_draws:
+                replace_hands = str_draws[:str_draws.index(compare_x)+1]
+                hand = hand.replace(x, range_string(replace_hands))
+            elif compare_x in hand_board_int:
+                replace_hands = str_flush + fulls_or_better + flush_suit + straights + hand_board_int[:hand_board_int.index(compare_x)+1]
+                hand = hand.replace(x, range_string(replace_hands))
+            elif x[1] in hand_board_int:
+                replace_hands = hand_board_int[:hand_board_int.index(x[1])]
+                better_kickers = kickers[:kickers.index(x[0])+1]
+                replace_hands = str_flush + fulls_or_better + flush_suit + straights + replace_hands + [k + x[1] for k in better_kickers]
+                hand = hand.replace(x, range_string(replace_hands))
+
+    # One pair or better
+    match_expr = re.compile(r'[' + ''.join(RANKS) + r']{1}\+')
+    hand_sections = match_expr.findall(hand)
+    if hand_sections:
+        for x in hand_sections:
+            compare_x = x[:-1]
+            if compare_x in hand_board_int:
+                replace_hands = str_flush + fulls_or_better + flush_suit + straights + hand_board_int[:hand_board_int.index(compare_x)+1]
+                hand = hand.replace(x, range_string(replace_hands))
+
+    # Hi-Lo hands like A2< etc.
+    match_expr = re.compile(r'[' + ''.join(LOW_CARDS) + r']{2}\<')
+    hand_sections = match_expr.findall(hand)
+    if hand_sections:
+        low_hands = return_lows(ranks)
+        for x in hand_sections:
+            compare_x = x[:-1]
+            if compare_x in low_hands:
+                replace_hands = low_hands[:low_hands.index(compare_x)+1]
+                hand = hand.replace(x, range_string(replace_hands))
+
+    if '+' in hand:
+        logging.error("Could not resolve one or more + expressions in hand:\n{0}".format(hand))
+    if '<' in hand:
+        logging.error("Could not resolve one or more < expressions in hand:\n{0}".format(hand))
+
+    return hand
+
 
 def range_string(hand_range):
     """

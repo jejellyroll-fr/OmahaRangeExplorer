@@ -1,0 +1,27 @@
+[project]
+name = "omaha-range-explorer"
+version = "0.1.0"
+description = "omaharangeexplorer"
+authors = [{ name = "toto", email = "toto@example.com" }]
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib==3.10.1",  # version stable
+    "mplcursors",
+]
+
+[project.optional-dependencies]
+dev = ["ruff"]
+
+[tool.setuptools]
+packages = { find = {} }
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+fix = true
+select = ["F", "E", "W", "I", "UP", "C90"]
+exclude = ["venv", ".venv", "build", "dist", "__pycache__"]
+
+[tool.ruff.isort]
+combine-as-imports = true
+known-first-party = ["omaha_range_explorer"]

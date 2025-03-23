@@ -82,23 +82,43 @@ class OddsOracleServer():
         self.log_ppt_answer(result)
         return result
 
-    def parse_ppt_answer(self, answer,keyword="EQUITY",num_digets=PPT_NUM_DIGETS):
-        number=0.0
+    def parse_ppt_answer(self, answer, keyword="EQUITY", num_digets=PPT_NUM_DIGETS):
+        number = 0.0
         if not answer:
-            logging.error("Could not get resulting number from PPT answer")
-            return number           
+            logging.error("[parse_ppt_answer] Empty answer from PPT")
+            return number
+
+        found_keyword = False
+
         for line in answer.splitlines():
             if keyword in line:
-                numbers=re.search('\d+\.\d+',line)
-                numbers=numbers.group(0)
-                if numbers=="0.0": return 0.0
-                if numbers=="1.0": return 1.0
-                if len(numbers)>=PPT_NUM_DIGETS and '.' in numbers:
-                    number=float(numbers)
+                found_keyword = True
+                logging.debug(f"[parse_ppt_answer] Matching line: {line}")
+                match = re.search(r'\d+[.,]\d+', line)
+                if match is None:
+                    logging.error(f"[parse_ppt_answer] No number found in line: {line}")
+                    continue
+                value = match.group(0).replace(',', '.')  # ← 🔥 conversion ici
+                logging.debug(f"[parse_ppt_answer] Extracted value: {value}")
+                if value == "0.0":
+                    return 0.0
+                if value == "1.0":
+                    return 1.0
+                if len(value) >= num_digets and '.' in value:
+                    try:
+                        return float(value)
+                    except ValueError:
+                        logging.error(f"[parse_ppt_answer] Couldn't convert to float: {value}")
+                        return number
                 else:
-                    logging.error("Could not get resulting number from PPT answer")
-                    return number
+                    logging.error(f"[parse_ppt_answer] Value doesn't meet digit/format requirement: {value}")
+
+        if not found_keyword:
+            logging.error(f"[parse_ppt_answer] No line with keyword '{keyword}' found in answer:\n{answer}")
+
         return number
+
+
 
     def equity_query(self, hero_range, villain_range):
         hero_range=self.format_range(hero_range)

@@ -24,33 +24,49 @@
 from board import *
 import re
 import logging
+import csv
 
-def replace_macros(hand,macro_file):
+
+
+def replace_macros(hand, macro_file):
     if '$' not in hand:
         return hand
-    macro_file.readline() # ignore first line
-    for line in macro_file:
-        macro='$'+line[0:line.index(",")]
-        line=line[line.index("\"")+1:]
-        replace_range=line[0:line.index("\"")]
-#        if macro in hand:
-#            print(macro + "       " + replace_range)
-        hand=hand.replace(macro,'('+replace_range+')')
-#    if '$' in hand:
-#        logging.error("Could not resolve all macros in hand:\n {0}".format(hand))
+
+    reader = csv.DictReader(macro_file)
+    macros = {}
+    for row in reader:
+        name = row["macro"].strip()
+        expands_to = row["expandsTo"].strip()
+        if expands_to.startswith('[') and expands_to.endswith(']'):
+            expands_to = expands_to[1:-1]
+        macros[name.upper()] = expands_to
+
+    pattern = re.compile(r'\$([A-Za-z0-9_]+)')
+    matches = pattern.findall(hand)
+    for macro_name in matches:
+        key = macro_name.upper()
+        if key in macros:
+            full_macro = f'${macro_name}'
+            expansion = f'({macros[key]})'
+            print(f"[DEBUG] Replacing {full_macro} with {expansion}")
+            hand = hand.replace(full_macro, expansion)
+
+    if '$' in hand:
+        print(f"[ERROR] Unresolved macro in: {hand}")
     return hand
+
 
 def parse_hand(hand,board_string):
     board = parse_board(board_string)
 
     # macros working with ppt server??
-    # try:
-    #     macro_file=open(MACRO_FILE_LOCATION)
-    # except:
-    #     logging.error("Cannot open MACRO file")
-    # else:
-    #     hand = replace_macros(hand,macro_file)
-    #     macro_file.close()
+    try:
+        macro_file=open(MACRO_FILE_LOCATION)
+    except:
+        logging.error("Cannot open MACRO file")
+    else:
+        hand = replace_macros(hand,macro_file)
+        macro_file.close()
 
     hand = replace_strings(hand,board)
     hand = remove_parentheses(hand)

@@ -22,7 +22,7 @@ INVALID_CHAR='#'
 
 DEBUG = False
 #MACRO_FILE_LOCATION="/home/johann/Documents/poker/oddsOracleMacros.csv"
-MACRO_FILE_LOCATION="./oddsOracleMacros.csv"
+MACRO_FILE_LOCATION="/home/jd/PPTOddsOracle/ui_jar/macro.csv"
 
 PPT_SERVER_PORT="http://localhost:37890"
 TEST_QUERY=("select avg(equity(hero, turn)) as EQUITY \n"
@@ -39,7 +39,7 @@ PPT_NEXT_CARD_EQ_TRIAL=100000
 PPT_MAX_SEC=10
 PPT_THREAD_CNT=16
 #PPT_LOCATION="/home/johann/usr/PPTOddsOracle/ui_jar/"
-PPT_LOCATION="C:\Program Files\PPTOddsOracle\ui_jar"
+PPT_LOCATION="/home/jd/PPTOddsOracle/ui_jar/"
 PPT_NUM_DIGETS=3 # whole length including decimal point (minimal length = 0.0)
 PPT_GAME="omahahi" # std game
 PPT_SYNTAX='Generic'

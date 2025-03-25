@@ -5,12 +5,12 @@ description = "omaharangeexplorer"
 authors = [{ name = "toto", email = "toto@example.com" }]
 requires-python = ">=3.10"
 dependencies = [
-    "matplotlib==3.10.1",  # version stable
+    "matplotlib==3.10.1",
     "mplcursors",
 ]
 
 [project.optional-dependencies]
-dev = ["ruff"]
+dev = ["ruff", "pytest"]
 
 [tool.setuptools]
 packages = { find = {} }
@@ -19,9 +19,17 @@ packages = { find = {} }
 line-length = 120
 target-version = "py311"
 fix = true
-select = ["F", "E", "W", "I", "UP", "C90"]
 exclude = ["venv", ".venv", "build", "dist", "__pycache__"]
 
-[tool.ruff.isort]
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "UP", "C90"]
+ignore = ["C901", "E501"]
+
+[tool.ruff.lint.isort]
 combine-as-imports = true
 known-first-party = ["omaha_range_explorer"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["test"]

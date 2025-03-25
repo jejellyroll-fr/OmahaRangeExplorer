@@ -18,4 +18,6 @@ FI40,"[22+,A2s+,K5s+,Q6s+,J7s+,T6s+,97s+,86s+,75s+,65s,A6o+,K7o+,Q8o+,J8o+,T9o]"
 FI50,"[22+,A2s+,K2s+,Q5s+,J5s+,T5s+,95s+,85s+,74s+,64s+,54s,A2o+,K7o+,Q8o+,J8o+,T8o+,98o]",First-In Raise ~50%,yes,
 FI60,"[22+,A2s+,K2s+,Q2s+,J2s+,T2s+,94s+,84s+,73s+,63s+,53s+,43s,A2o+,K5o+,Q7o+,J7o+,T7o+,97o+,87o]",First-In Raise ~60%,yes,
 3B8O,"[JJ,QQ,KK,AA,AKs,AKo,AQs,AJs,KQs,TT]",3-bet ~8% OOP,yes,
-
+3B10I,"[TT+,AKs,AKo,AQs,AJs,KQs,AJ]",3-bet ~10% vs open (IP),yes,
+3B15,"[TT+,AKs,AKo,AQs,AJs,ATs,KQs,KJs,QJs,AJ]",3-bet ~15% range,yes,
+3B6,"[QQ+,AKs,AKo,AQs,AJs,KQs]",3-bet ~6% range,yes,

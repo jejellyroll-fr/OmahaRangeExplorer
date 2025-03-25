@@ -1,53 +1,92 @@
 #!/usr/bin/env python3
-# main_gui.py --- 
-# 
+# main_gui.py ---
+#
 # Filename: main_gui.py
-# Description: 
-# Author: Johann 
-# Maintainer: 
+# Description:
+# Author: Johann
+# Maintainer:
 # Created: Die Apr  5 14:16:51 2016 (+0200)
-# Version: 
-# Last-Updated: 
-#           By: 
-#     Update #: 0
-# URL: 
-# Keywords: 
-# Compatibility: 
-# 
-# 
-
-# Commentary: 
-# 
+# Version:
+# Last-Updated:
+#           By: jejellyroll
+#     Update #: 1
+# URL:
+# Keywords:
+# Compatibility:
+#
 #
 
-from tkinter import *
-from tkinter import ttk
-from tkinter import scrolledtext
-from tkinter import messagebox
-from tkinter import filedialog
+# Commentary:
+#
+#
 
-from utils import *
-from gui_elements import *
-from ppt import OddsOracleServer
-from board import parse_board
-from board import return_string
-from hand import parse_hand
-
-from queue import Queue
-import threading
-import time
-import pickle
 import logging
+import pickle
+import threading
+from queue import Queue
+from tkinter import BOTH, FALSE, TOP, Menu, Tk, Toplevel, filedialog, scrolledtext, ttk
 
 import matplotlib
+
+from board import parse_board, return_string
+from gui_elements import (
+    EV_PLAYER_FRAME_PADDING,
+    FRAME_PADDING,
+    PRE_INPUT_LENTH,
+    BooleanVar,
+    E,
+    EvCalcPlayer,
+    N,
+    Range,
+    RangePreflop,
+    S,
+    ScrolledTextLogger,
+    StringVar,
+    W,
+)
+from hand import parse_hand
+from ppt import OddsOracleServer
+from utils import (
+    BET4_3BET,
+    BET4_INFO,
+    BET4_OPEN,
+    BET4_POT,
+    BET4_RESULT,
+    BET4_STACK,
+    BET_VS_1_INFO,
+    BET_VS_1_RESULT_STR,
+    BET_VS_2_INFO,
+    BET_VS_2_RESULT_STR,
+    BETSIZE,
+    BUTTON_PADX,
+    DOTS,
+    FONT_FAM,
+    FONT_FAM_MONO,
+    FONT_SIZE,
+    GENERAL_SETTING_PADDING,
+    INPUT_LENGTH,
+    PADX,
+    PADY,
+    PLAYER_FRAME_PADDING,
+    POTSIZE,
+    RAISESIZE,
+    RANGE_FRAME_PADDING,
+    RERAISESIZE,
+    STACKSIZE,
+    STREET,
+    TEXT_OUTPUT_HEIGHT,
+    TEXT_OUTPUT_WIDTH,
+    TITLE,
+)
+
 matplotlib.use('TkAgg')
 
-from numpy import arange, sin, pi
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
+from numpy import arange
 
 ###
-# Range Builder Functions 
+# Range Builder Functions
 ###
 
 def update_ranges():
@@ -79,7 +118,7 @@ def calc_ppt_set_value(range_1, range_2):
     else:
         villain_range=range_2
         villain_selected_range=range_2
-    
+
     hero_range=range_1.get_start_range()
     hero_selected_range=range_1.get_selected_range()
     hero_subrange_0=range_1.get_range(0,start_range=True)
@@ -88,23 +127,24 @@ def calc_ppt_set_value(range_1, range_2):
     hero_subrange_3=range_1.get_range(3,start_range=True)
 
     logging.info(DOTS)
-    logging.info("Start Calculation for Board: {0}".format(ppt_client.board))
-    logging.info("Game= {0}, Dead= {1}, Trials= {2}".format(ppt_client.game, ppt_client.dead, ppt_client.trial))
-    logging.info("Hero start range: {0}".format(hero_range))
-    logging.info("Villain start range: {0}".format(villain_range))
-    logging.info("Villain selected range: {0}".format(villain_selected_range))
-    
+    logging.info(f"Start Calculation for Board: {ppt_client.board}")
+    logging.info(f"Game= {ppt_client.game}, Dead= {ppt_client.dead}, Trials= {ppt_client.trial}")
+    logging.info(f"Hero start range: {hero_range}")
+    logging.info(f"Villain start range: {villain_range}")
+    logging.info(f"Villain selected range: {villain_selected_range}")
+
     if hero_range:
         equity=ppt_client.equity_query(hero_range,villain_range)
         range_1.set_range_equity(equity)
-        logging.info("Equity is {0:.1f} for hero overall range: {1}".format(equity,hero_range))
-    else: range_1.set_range_equity(0)
+        logging.info(f"Equity is {equity:.1f} for hero overall range: {hero_range}")
+    else:
+        range_1.set_range_equity(0)
     if hero_subrange_0:
         frequency=ppt_client.in_range_query(hero_range,villain_selected_range,hero_subrange_0)
         range_1.set_freq(0,frequency)
         equity=ppt_client.equity_query(hero_subrange_0,villain_selected_range)
         range_1.set_equity(0,equity)
-        logging.info("Hero sub-range 1: {0} (Eq: {1:.3f}; Freq: {2:.3f})".format(hero_subrange_0,equity,frequency))
+        logging.info(f"Hero sub-range 1: {hero_subrange_0} (Eq: {equity:.3f}; Freq: {frequency:.3f})")
     else:
         range_1.set_freq(0,0)
         range_1.set_equity(0,0)
@@ -113,40 +153,40 @@ def calc_ppt_set_value(range_1, range_2):
         range_1.set_freq(1,frequency)
         equity=ppt_client.equity_query(hero_subrange_1,villain_selected_range)
         range_1.set_equity(1,equity)
-        logging.info("Hero sub-range 2: {0} (Eq: {1:.3f}; Freq: {2:.3f})".format(hero_subrange_1,equity,frequency))
+        logging.info(f"Hero sub-range 2: {hero_subrange_1} (Eq: {equity:.3f}; Freq: {frequency:.3f})")
     else:
         range_1.set_freq(1,0)
-        range_1.set_equity(1,0)        
+        range_1.set_equity(1,0)
     if hero_subrange_2:
         frequency=ppt_client.in_range_query(hero_range,villain_selected_range,hero_subrange_2)
         range_1.set_freq(2,frequency)
         equity=ppt_client.equity_query(hero_subrange_2,villain_selected_range)
         range_1.set_equity(2,equity)
-        logging.info("Hero sub-range 3: {0} (Eq: {1:.3f}; Freq: {2:.3f})".format(hero_subrange_2,equity,frequency))
+        logging.info(f"Hero sub-range 3: {hero_subrange_2} (Eq: {equity:.3f}; Freq: {frequency:.3f})")
     else:
         range_1.set_freq(2,0)
-        range_1.set_equity(2,0)        
+        range_1.set_equity(2,0)
     if hero_subrange_3:
         frequency=ppt_client.in_range_query(hero_range,villain_selected_range,hero_subrange_3)
         range_1.set_freq(3,frequency)
         equity=ppt_client.equity_query(hero_subrange_3,villain_selected_range)
         range_1.set_equity(3,equity)
-        logging.info("Hero sub-range 4: {0} (Eq: {1:.3f}; Freq: {2:.3f})".format(hero_subrange_3,equity,frequency))
+        logging.info(f"Hero sub-range 4: {hero_subrange_3} (Eq: {equity:.3f}; Freq: {frequency:.3f})")
     else:
         range_1.set_freq(3,0)
-        range_1.set_equity(3,0)       
+        range_1.set_equity(3,0)
     if hero_selected_range:
         frequency=ppt_client.in_range_query(hero_range,villain_selected_range,hero_selected_range)
-        range_1.set_summary_freq(frequency)        
+        range_1.set_summary_freq(frequency)
         equity=ppt_client.equity_query(hero_selected_range,villain_selected_range)
-        logging.info("Hero selected range: {0} (Eq: {1:.3f}; Freq: {2:.3f})".format(hero_selected_range,equity,frequency))
+        logging.info(f"Hero selected range: {hero_selected_range} (Eq: {equity:.3f}; Freq: {frequency:.3f})")
         range_1.set_summary_equity(equity)
     else:
         range_1.set_summary_freq(0)
         range_1.set_summary_equity(0)
-    logging.info("Finished Calculation: {0}".format(ppt_client.board))
+    logging.info(f"Finished Calculation: {ppt_client.board}")
     logging.info(DOTS+"\n")
-    
+
 def eval_range(range_1, range_2, street):
     # takes 2 Range elements and sets all frequency and equities for range_1 vs selected range 2
     update_ranges()
@@ -160,8 +200,8 @@ def calc_ppt_set_value_3way(range_1, range_2, range_3):
     villain1_selected_range=range_2.get_selected_range()
 
     villain2_range=range_3.get_start_range()
-    villain2_selected_range=range_3.get_selected_range()    
-    
+    villain2_selected_range=range_3.get_selected_range()
+
     hero_range=range_1.get_start_range()
     hero_selected_range=range_1.get_selected_range()
     hero_subrange_0=range_1.get_range(0,start_range=True)
@@ -170,25 +210,26 @@ def calc_ppt_set_value_3way(range_1, range_2, range_3):
     hero_subrange_3=range_1.get_range(3,start_range=True)
 
     logging.info(DOTS)
-    logging.info("Start 3way calculation for board: {0}".format(ppt_client.board))
-    logging.info("Game= {0}, Dead= {1}, Trials= {2}".format(ppt_client.game, ppt_client.dead, ppt_client.trial))
-    logging.info("Hero start range: {0}".format(hero_range))
-    logging.info("Villain1 start range: {0} \n".format(villain1_range))
-    logging.info("Villain2 start range: {0} \n".format(villain2_range))
-    logging.info("Villain1 selected range: {0} \n".format(villain1_selected_range))
-    logging.info("Villain2 selected range: {0} \n".format(villain2_selected_range))    
-    
+    logging.info(f"Start 3way calculation for board: {ppt_client.board}")
+    logging.info(f"Game= {ppt_client.game}, Dead= {ppt_client.dead}, Trials= {ppt_client.trial}")
+    logging.info(f"Hero start range: {hero_range}")
+    logging.info(f"Villain1 start range: {villain1_range} \n")
+    logging.info(f"Villain2 start range: {villain2_range} \n")
+    logging.info(f"Villain1 selected range: {villain1_selected_range} \n")
+    logging.info(f"Villain2 selected range: {villain2_selected_range} \n")
+
     if hero_range:
         equity=ppt_client.equity_query_3way(hero_range,villain1_range,villain2_range)
         range_1.set_range_equity(equity)
-        logging.info("Equity is {0:.3f} for hero overall range: {1} \n".format(equity,hero_range))
-    else: range_1.set_range_equity(0)
+        logging.info(f"Equity is {equity:.3f} for hero overall range: {hero_range} \n")
+    else:
+        range_1.set_range_equity(0)
     if hero_subrange_0:
         frequency=ppt_client.in_range_query_3way(hero_range,villain1_selected_range,villain2_selected_range,hero_subrange_0)
         range_1.set_freq(0,frequency)
         equity=ppt_client.equity_query_3way(hero_subrange_0,villain1_selected_range,villain2_selected_range)
         range_1.set_equity(0,equity)
-        logging.info("Hero sub-range 1: {0} (Eq: {1:.3f}; Freq: {2:.3f})".format(hero_subrange_0,equity,frequency))
+        logging.info(f"Hero sub-range 1: {hero_subrange_0} (Eq: {equity:.3f}; Freq: {frequency:.3f})")
     else:
         range_1.set_freq(0,0)
         range_1.set_equity(0,0)
@@ -197,38 +238,38 @@ def calc_ppt_set_value_3way(range_1, range_2, range_3):
         range_1.set_freq(1,frequency)
         equity=ppt_client.equity_query_3way(hero_subrange_1,villain1_selected_range,villain2_selected_range)
         range_1.set_equity(1,equity)
-        logging.info("Hero sub-range 2: {0} (Eq: {1:.3f}; Freq: {2:.3f})".format(hero_subrange_1,equity,frequency))        
+        logging.info(f"Hero sub-range 2: {hero_subrange_1} (Eq: {equity:.3f}; Freq: {frequency:.3f})")
     else:
         range_1.set_freq(1,0)
-        range_1.set_equity(1,0)        
+        range_1.set_equity(1,0)
     if hero_subrange_2:
         frequency=ppt_client.in_range_query_3way(hero_range,villain1_selected_range,villain2_selected_range,hero_subrange_2)
         range_1.set_freq(2,frequency)
         equity=ppt_client.equity_query_3way(hero_subrange_2,villain1_selected_range,villain2_selected_range)
         range_1.set_equity(2,equity)
-        logging.info("Hero sub-range 3: {0} (Eq: {1:.3f}; Freq: {2:.3f})".format(hero_subrange_2,equity,frequency))
+        logging.info(f"Hero sub-range 3: {hero_subrange_2} (Eq: {equity:.3f}; Freq: {frequency:.3f})")
     else:
         range_1.set_freq(2,0)
-        range_1.set_equity(2,0)        
+        range_1.set_equity(2,0)
     if hero_subrange_3:
         frequency=ppt_client.in_range_query_3way(hero_range,villain1_selected_range,villain2_selected_range,hero_subrange_3)
         range_1.set_freq(3,frequency)
         equity=ppt_client.equity_query_3way(hero_subrange_3,villain1_selected_range,villain2_selected_range)
         range_1.set_equity(3,equity)
-        logging.info("Hero sub-range 4: {0} (Eq: {1:.3f}; Freq: {2:.3f})".format(hero_subrange_3,equity,frequency))        
+        logging.info(f"Hero sub-range 4: {hero_subrange_3} (Eq: {equity:.3f}; Freq: {frequency:.3f})")
     else:
         range_1.set_freq(3,0)
-        range_1.set_equity(3,0)       
+        range_1.set_equity(3,0)
     if hero_selected_range:
         frequency=ppt_client.in_range_query_3way(hero_range,villain1_selected_range,villain2_selected_range,hero_selected_range)
-        range_1.set_summary_freq(frequency)        
+        range_1.set_summary_freq(frequency)
         equity=ppt_client.equity_query_3way(hero_selected_range,villain1_selected_range,villain2_selected_range)
         range_1.set_summary_equity(equity)
-        logging.info("Hero selected range: {0} (Eq: {1:.3f}; Freq: {2:.3f})".format(hero_selected_range,equity,frequency))        
+        logging.info(f"Hero selected range: {hero_selected_range} (Eq: {equity:.3f}; Freq: {frequency:.3f})")
     else:
         range_1.set_summary_freq(0)
         range_1.set_summary_equity(0)
-    logging.info("Finished Calculation: {0}".format(ppt_client.board))
+    logging.info(f"Finished Calculation: {ppt_client.board}")
     logging.info(DOTS)
 
 def eval_range_3way(range_1, range_2, range_3, street):
@@ -242,12 +283,12 @@ def eval_player_1():
     eval_range(rb_p1_flop, rb_p2_flop, "flop")
     eval_range(rb_p1_turn, rb_p2_turn, "turn")
     eval_range(rb_p1_river, rb_p2_river, "river")
-    
+
 def eval_player_2():
     eval_range(rb_p2_flop, rb_p1_flop,"flop")
     eval_range(rb_p2_turn, rb_p1_turn, "turn")
     eval_range(rb_p2_river, rb_p1_river, "river")
-    
+
 
 def eval_range_distribution():
     update_ranges()
@@ -266,7 +307,7 @@ def get_range_distribution_ranges():
     elif  hero_range_sel == 'Player 1 Turn':
         hero_range=expand_range(rb_p1_turn.get_selected_range(),"turn")
     elif  hero_range_sel == 'Player 2 Turn':
-        hero_range=expand_range(rb_p2_turn.get_selected_range(),"turn")       
+        hero_range=expand_range(rb_p2_turn.get_selected_range(),"turn")
     elif  hero_range_sel == 'Player 1 River':
         hero_range=expand_range(rb_p1_river.get_selected_range(),"river")
     elif  hero_range_sel == 'Player 2 River':
@@ -283,21 +324,21 @@ def get_range_distribution_ranges():
     if villain_range_sel == 'Player 1 Flop':
         vil_range=expand_range(rb_p1_flop.get_selected_range(),"flop")
     elif  villain_range_sel == 'Player 2 Flop':
-        vil_range=expand_range(rb_p2_flop.get_selected_range(),"flop")                      
+        vil_range=expand_range(rb_p2_flop.get_selected_range(),"flop")
     elif  villain_range_sel == 'Player 1 Turn':
-        vil_range=expand_range(rb_p1_turn.get_selected_range(),"turn")                      
+        vil_range=expand_range(rb_p1_turn.get_selected_range(),"turn")
     elif  villain_range_sel == 'Player 2 Turn':
-        vil_range=expand_range(rb_p2_turn.get_selected_range(),"turn")                      
+        vil_range=expand_range(rb_p2_turn.get_selected_range(),"turn")
     elif  villain_range_sel == 'Player 1 River':
-        vil_range=expand_range(rb_p1_river.get_selected_range(),"river")                      
+        vil_range=expand_range(rb_p1_river.get_selected_range(),"river")
     elif  villain_range_sel == 'Player 2 River':
-        vil_range=expand_range(rb_p2_river.get_selected_range(),"river")                      
+        vil_range=expand_range(rb_p2_river.get_selected_range(),"river")
     elif villain_range_sel == 'Hero':
-        vil_range=expand_range(ev_hero.post.get_selected_range(),"river")                      
+        vil_range=expand_range(ev_hero.post.get_selected_range(),"river")
     elif villain_range_sel == 'Villain 1':
-        vil_range=expand_range(ev_villain1.post.get_selected_range(),"river")                      
+        vil_range=expand_range(ev_villain1.post.get_selected_range(),"river")
     elif villain_range_sel == 'Villain 2':
-        vil_range=expand_range(ev_villain2.post.get_selected_range(),"river")                      
+        vil_range=expand_range(ev_villain2.post.get_selected_range(),"river")
     return [hero_range,vil_range]
 
 
@@ -311,7 +352,7 @@ def river_card_calc():
     update_ranges()
     ppt_client.board=return_string(parse_board(gi_board.get()),"turn") if parse_board(gi_board.get()) else ""
     start_ranges=get_range_distribution_ranges()
-    ppt_queue.put((ppt_client.next_card_eval,start_ranges[0],start_ranges[1]))    
+    ppt_queue.put((ppt_client.next_card_eval,start_ranges[0],start_ranges[1]))
     return
 ###
 # Equity Calcs Functions
@@ -320,7 +361,7 @@ def river_card_calc():
 def bet_vs_1_calc():
     eval_range(ev_hero.post,ev_villain1.post,ev_bet_vs1_street.get())
     eval_range(ev_villain1.post,ev_hero.post,ev_bet_vs1_street.get())
-    
+
     ppt_queue.put((ppt_client.bet_vs_1_calculations, ev_bet_vs1_result_str, ev_hero.post,ev_villain1.post,
                    ev_bet_vs1_hand.get(),
                    ev_bet_vs1_potsize.get(),ev_bet_vs1_stacksize.get(),ev_bet_vs1_betsize.get(),
@@ -332,17 +373,17 @@ def rank_hand():
     update_ranges()
     ppt_queue.put((ppt_client.rank_hand,
                    ev_bet_vs1_hand.get()))
-    
+
 def bet_vs_2_calc():
     eval_range_3way(ev_hero.post,ev_villain1.post,ev_villain2.post,ev_bet_vs2_street.get())
     eval_range_3way(ev_villain1.post,ev_villain2.post,ev_hero.post,ev_bet_vs2_street.get())
     eval_range_3way(ev_villain2.post,ev_villain1.post,ev_hero.post,ev_bet_vs2_street.get())
-    
+
     ppt_queue.put((ppt_client.bet_vs_2_calculations, ev_bet_vs2_result_str, ev_hero.post, ev_villain1.post
                    ,ev_villain2.post, ev_bet_vs2_hand.get(), ev_bet_vs2_potsize.get()
                    ,ev_bet_vs2_stacksize1.get(),ev_bet_vs2_stacksize2.get(),
                    ev_bet_vs2_betsize.get(),ev_bet_vs2_raisesize.get(),ev_bet_vs2_reraisesize.get(),ev_bet_vs2_street.get() ))
-    
+
     return
 
 def do_4bet_calc():
@@ -351,12 +392,12 @@ def do_4bet_calc():
                    ev_villain1.post.get_certain_range([0]),ev_4bet_stacksize.get(), ev_4bet_opensize.get(),
                    ev_4bet_3bsize.get(), ev_4bet_potsize.get()))
     return
-    
+
 def call_4bet_calc():
     update_ranges()
     ppt_queue.put((ppt_client.call_4bet, ev_4bet_result_str, ev_4bet_hand.get(), ev_villain1.pre.get_range(),
                   ev_4bet_stacksize.get(), ev_4bet_opensize.get(),
-                   ev_4bet_3bsize.get(), ev_4bet_potsize.get()))    
+                   ev_4bet_3bsize.get(), ev_4bet_potsize.get()))
     return
 
 def hero_ship_plot():
@@ -419,7 +460,7 @@ def villain_ship_plot():
 
 def save_session():
     filename = filedialog.asksaveasfilename()
-    logging.debug("Filename={}".format(filename))
+    logging.debug(f"Filename={filename}")
     try:
         data = {
             "gi_board": gi_board.get(),
@@ -448,7 +489,7 @@ def save_session():
             "ev_4bet_opensize":ev_4bet_opensize.get(),
             "ev_4bet_3bsize":ev_4bet_3bsize.get(),
             "ev_4bet_hand":ev_4bet_hand.get(),
-            
+
             "rb_p1_pre.include_range":rb_p1_pre.include_range.get(),
             "rb_p1_pre.exclude_range":rb_p1_pre.exclude_range.get(),
             "rb_p2_pre.include_range":rb_p2_pre.include_range.get(),
@@ -505,7 +546,7 @@ def save_session():
             "ev_villain1.post.sub_range_list[1].input_range":ev_villain1.post.sub_range_list[1].input_range.get(),
             "ev_villain1.post.sub_range_list[2].input_range":ev_villain1.post.sub_range_list[2].input_range.get(),
             "ev_villain1.post.sub_range_list[3].input_range":ev_villain1.post.sub_range_list[3].input_range.get(),
-            
+
             "ev_villain2.post.sub_range_list[0].input_range":ev_villain2.post.sub_range_list[0].input_range.get(),
             "ev_villain2.post.sub_range_list[1].input_range":ev_villain2.post.sub_range_list[1].input_range.get(),
             "ev_villain2.post.sub_range_list[2].input_range":ev_villain2.post.sub_range_list[2].input_range.get(),
@@ -514,12 +555,12 @@ def save_session():
         with open(filename, "wb") as f:
             pickle.dump(data, f)
     except Exception as e:
-            logging.error("Error saving session:\n" + str(e))            
+            logging.error("Error saving session:\n" + str(e))
     return
 
 def load_session():
     filename = filedialog.askopenfilename()
-    logging.debug("Filename={}".format(filename))
+    logging.debug(f"Filename={filename}")
     try:
         with open(filename,"rb") as f:
             data = pickle.load(f)
@@ -532,16 +573,16 @@ def load_session():
         ev_bet_vs1_potsize.set(data["ev_bet_vs1_potsize"])
         ev_bet_vs1_betsize.set(data["ev_bet_vs1_betsize"])
         ev_bet_vs1_raisesize.set(data["ev_bet_vs1_raisesize"])
-        ev_bet_vs1_reraisesize.set(data["ev_bet_vs1_reraisesize"])        
+        ev_bet_vs1_reraisesize.set(data["ev_bet_vs1_reraisesize"])
         ev_bet_vs1_hand.set(data["ev_bet_vs1_hand"])
         ev_bet_vs1_street.set(data["ev_bet_vs1_street"])
 
         ev_bet_vs2_stacksize1.set(data["ev_bet_vs2_stacksize1"])
-        ev_bet_vs2_stacksize2.set(data["ev_bet_vs2_stacksize2"])        
+        ev_bet_vs2_stacksize2.set(data["ev_bet_vs2_stacksize2"])
         ev_bet_vs2_potsize.set(data["ev_bet_vs2_potsize"])
         ev_bet_vs2_betsize.set(data["ev_bet_vs2_betsize"])
         ev_bet_vs2_raisesize.set(data["ev_bet_vs2_raisesize"])
-        ev_bet_vs2_reraisesize.set(data["ev_bet_vs2_reraisesize"])        
+        ev_bet_vs2_reraisesize.set(data["ev_bet_vs2_reraisesize"])
         ev_bet_vs2_hand.set(data["ev_bet_vs2_hand"])
         ev_bet_vs2_street.set(data["ev_bet_vs2_street"])
 
@@ -550,7 +591,7 @@ def load_session():
         ev_4bet_opensize.set(data["ev_4bet_opensize"])
         ev_4bet_3bsize.set(data["ev_4bet_3bsize"])
         ev_4bet_hand.set(data["ev_4bet_hand"])
-        
+
         rb_p1_pre.include_range.set(data["rb_p1_pre.include_range"])
         rb_p1_pre.exclude_range.set(data["rb_p1_pre.exclude_range"])
         rb_p2_pre.include_range.set(data["rb_p2_pre.include_range"])
@@ -611,9 +652,9 @@ def load_session():
         ev_villain2.post.sub_range_list[0].input_range.set(data["ev_villain2.post.sub_range_list[0].input_range"])
         ev_villain2.post.sub_range_list[1].input_range.set(data["ev_villain2.post.sub_range_list[1].input_range"])
         ev_villain2.post.sub_range_list[2].input_range.set(data["ev_villain2.post.sub_range_list[2].input_range"])
-        ev_villain2.post.sub_range_list[3].input_range.set(data["ev_villain2.post.sub_range_list[3].input_range"])      
+        ev_villain2.post.sub_range_list[3].input_range.set(data["ev_villain2.post.sub_range_list[3].input_range"])
     except Exception as e:
-            logging.error("Error loading session:\n" + str(e))            
+            logging.error("Error loading session:\n" + str(e))
     return
 
 def clear_session():
@@ -621,15 +662,15 @@ def clear_session():
     gi_dead.set("")
     gi_game.set("omahahi")
     gi_debug.set(0)
-    
+
     ev_bet_vs1_stacksize.set(STACKSIZE)
     ev_bet_vs1_potsize.set(POTSIZE)
     ev_bet_vs1_betsize.set(BETSIZE)
     ev_bet_vs1_raisesize.set(RAISESIZE)
     ev_bet_vs1_reraisesize.set(RERAISESIZE)
-    ev_bet_vs1_street.set(STREET)     
+    ev_bet_vs1_street.set(STREET)
     ev_bet_vs1_hand.set("")
-   
+
     ev_bet_vs2_hand.set("")
     ev_bet_vs2_stacksize1.set(STACKSIZE)
     ev_bet_vs2_stacksize2.set(STACKSIZE)
@@ -638,12 +679,12 @@ def clear_session():
     ev_bet_vs2_raisesize.set(RAISESIZE)
     ev_bet_vs2_reraisesize.set(RERAISESIZE)
     ev_bet_vs2_street.set(STREET)
-    
+
     ev_4bet_stacksize.set(BET4_STACK)
     ev_4bet_potsize.set(BET4_POT)
     ev_4bet_opensize.set(BET4_OPEN)
     ev_4bet_3bsize.set(BET4_3BET)
-        
+
     rb_p1_pre.include_range.set("")
     rb_p1_pre.exclude_range.set("")
     rb_p2_pre.include_range.set("")
@@ -657,7 +698,7 @@ def clear_session():
     rd_range.sub_range_list[1].x_box_value.set(0)
     rd_range.sub_range_list[2].x_box_value.set(0)
     rd_range.sub_range_list[3].x_box_value.set(0)
-    
+
     rd_start_range.set('Player 1 Flop')
     rd_vs_range.set('Player 2 Flop')
 
@@ -729,7 +770,7 @@ def clear_session():
     ev_hero.post.sub_range_list[1].x_box_value.set(0)
     ev_hero.post.sub_range_list[2].x_box_value.set(0)
     ev_hero.post.sub_range_list[3].x_box_value.set(0)
-    
+
     ev_villain1.post.sub_range_list[0].input_range.set("")
     ev_villain1.post.sub_range_list[1].input_range.set("")
     ev_villain1.post.sub_range_list[2].input_range.set("")
@@ -739,7 +780,7 @@ def clear_session():
     ev_villain1.post.sub_range_list[1].x_box_value.set(0)
     ev_villain1.post.sub_range_list[2].x_box_value.set(0)
     ev_villain1.post.sub_range_list[3].x_box_value.set(0)
-    
+
     ev_villain2.post.sub_range_list[0].input_range.set("")
     ev_villain2.post.sub_range_list[1].input_range.set("")
     ev_villain2.post.sub_range_list[2].input_range.set("")
@@ -751,8 +792,8 @@ def clear_session():
     ev_villain2.post.sub_range_list[3].x_box_value.set(0)
 
 def paste_hand():
-    logging.info("Clipboard:\n {}".format(root.clipboard_get()))
-    
+    logging.info(f"Clipboard:\n {root.clipboard_get()}")
+
 def change_logging_status(checkbox_status):
     if checkbox_status:
         logger.setLevel(logging.DEBUG)
@@ -772,19 +813,19 @@ def ppt_task_consumer(queue):
             logging.info("KILL PPT Thread")
             break
         if args:
-            logging.debug("Trying to execute the following PPT task: {0}".format(function))
+            logging.debug(f"Trying to execute the following PPT task: {function}")
             function(*args)
             logging.debug("Finished PPT task")
         else:
-            logging.debug("Trying to execute the following PPT task: {0}.".format(function))
+            logging.debug(f"Trying to execute the following PPT task: {function}.")
             function()
             logging.debug("Finished PPT task")
-            
+
 def set_ppt_board(street):
     ppt_client.board=""
     if parse_board(gi_board.get()):
         ppt_client.board=return_string(parse_board(gi_board.get()),street)
-        
+
 def expand_range(range_string, street):
     board=return_string(parse_board(gi_board.get()),street) if parse_board(gi_board.get()) else ""
     return parse_hand(range_string,board)

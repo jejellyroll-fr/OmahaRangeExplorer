@@ -1,31 +1,45 @@
 #!/usr/bin/env python3
-# hand.py --- 
-# 
+# hand.py ---
+#
 # Filename: hand.py
-# Description: 
-# Author: Johann 
-# Maintainer: 
-# Created: Mon Mar 14 17:50:36 2016 
-# Version: 
-# Last-Updated: 
-#           By: 
-#     Update #: 0
-# URL: 
-# Keywords: 
-# Compatibility: 
-# 
-# 
+# Description:
+# Author: Johann
+# Maintainer:
+# Created: Mon Mar 14 17:50:36 2016
+# Version:
+# Last-Updated:
+#           By: jejellyroll
+#     Update #: 1
+# URL:
+# Keywords:
+# Compatibility:
+#
+#
 
-# Commentary: 
-# 
+# Commentary:
+#
 # Possible to remove additional redudant () in remove parenthesis
 # Tue Jan  3 04:05:32 2017 hilo sign - is not good because of AA-TT hands etc
 
-from board import *
-import re
-import logging
 import csv
-from utils import RANKS_ORDERED
+import logging
+import re
+
+from board import (
+    hand_board_intersections,
+    parse_board,
+    return_flush_blocker,
+    return_flushdraws,
+    return_flushes,
+    return_fulls_or_better,
+    return_kicker,
+    return_lows,
+    return_ranks,
+    return_str_flush,
+    return_straight_draws,
+    return_straights,
+)
+from utils import LOW_CARDS, MACRO_FILE_LOCATION, RANK_ORDER, RANKS, RANKS_ORDERED, SUITS
 
 
 def replace_macros(hand, macro_file):
@@ -48,11 +62,11 @@ def replace_macros(hand, macro_file):
         if key in macros:
             full_macro = f'${macro_name}'
             expansion = f'({macros[key]})'
-            print(f"[DEBUG] Replacing {full_macro} with {expansion}")
+            logging.debug(f"Replacing {full_macro} with {expansion}")
             hand = hand.replace(full_macro, expansion)
 
     if '$' in hand:
-        print(f"[ERROR] Unresolved macro in: {hand}")
+        logging.debug(f"Unresolved macro in: {hand}")
     return hand
 
 
@@ -62,7 +76,7 @@ def parse_hand(hand,board_string):
     # macros working with ppt server??
     try:
         macro_file=open(MACRO_FILE_LOCATION)
-    except:
+    except FileNotFoundError:
         logging.error("Cannot open MACRO file")
     else:
         hand = replace_macros(hand,macro_file)
@@ -104,7 +118,7 @@ def expand_plus_notation(hand):
         start = rank_index(low_rank)
         return [high_rank + R for R in RANKS_ORDERED[start:] if R != high_rank]
 
-    import re
+
     pocket_pattern = re.compile(r'([2-9TJQKA])\1\+')
     pattern = re.compile(r'([2-9TJQKA])([2-9TJQKA])(s|o)?\+')
 
@@ -134,8 +148,8 @@ def replace_strings(hand, board):
     Returns string with all + or < expressions replaced.
     """
     ranks = return_ranks(board)
-    ranks_no_count = set(ranks)
-    suits = return_suits(board)
+    #ranks_no_count = set(ranks)
+    #suits = return_suits(board)
     flushes = return_flushes(board)
     straights = return_straights(ranks)
     fulls_or_better = return_fulls_or_better(ranks)
@@ -229,9 +243,9 @@ def replace_strings(hand, board):
                 hand = hand.replace(x, range_string(replace_hands))
 
     if '+' in hand:
-        logging.error("Could not resolve one or more + expressions in hand:\n{0}".format(hand))
+        logging.error(f"Could not resolve one or more + expressions in hand:\n{hand}")
     if '<' in hand:
-        logging.error("Could not resolve one or more < expressions in hand:\n{0}".format(hand))
+        logging.error(f"Could not resolve one or more < expressions in hand:\n{hand}")
 
     return hand
 
@@ -250,80 +264,56 @@ def range_string(hand_range):
     for x in hand_range_compact:
         hand_string=hand_string+x+', '
     hand_string=hand_string[0:-2] + ')'
-    
+
     return hand_string
 
 def remove_parentheses(range_string):
-    start_index=0
-    index_touple_list=[]
-    
-    for char in range_string: # find index of matching parenthesis and save as touple list
+    prev = None
+    while prev != range_string:
+        prev = range_string
+        range_string = remove_one_layer_of_parentheses(range_string)
+    return range_string
+
+
+def remove_one_layer_of_parentheses(range_string):
+    index_touple_list = []
+
+    # Retrieves all pairs of indices corresponding to matched brackets
+    for i, char in enumerate(range_string):
         if char != '(':
-            start_index+=1
-            continue # find first (
-        sub_string=range_string[start_index+1:]
-        # print(sub_string)
-        end_index=start_index+1
-        counter=0
+            continue
+        sub_string = range_string[i+1:]
+        end_index = i + 1
+        counter = 0
         for char_sub in sub_string:
-            # print("Index= {0} Counter= {1} Char= {2}".format(end_index,counter,char_sub))
-            if char_sub == ')' and counter==0 :
-                index_touple_list.append((start_index,end_index))
-                break # found closing )
+            if char_sub == ')' and counter == 0:
+                index_touple_list.append((i, end_index))
+                break
             elif char_sub == '(':
-                counter+=1
-                end_index+=1
+                counter += 1
             elif char_sub == ')':
-                counter-=1
-                end_index+=1
-            else:
-                end_index+=1
-        start_index+=1
+                counter -= 1
+            end_index += 1
 
-    remove_index_list=[] # list of indizes to remove from string
+    remove_index_list = []
     for touple in index_touple_list:
-        if (touple[0] == 0) and (touple[1] == len(range_string)-1): # remove if they are at beginning and end
-            remove_index_list.append(touple[0])
-            remove_index_list.append(touple[1])
-        if (range_string[touple[0]+1] == '(') and (range_string[touple[1]-1] == ')'): # double parenthesis
-            if (touple[0]+1,touple[1]-1) in index_touple_list: # check if inner parenthesis are matching -> redundent
-                remove_index_list.append(touple[0])
-                remove_index_list.append(touple[1])
-        if touple[1] - touple[0] == 1: # empty parenthesis
-            remove_index_list.append(touple[0])
-            remove_index_list.append(touple[1])
-        # if touple[0] == 0: # start string
-        #     if touple[1] == len(range_string)-1: # remove if they are at beginning and end
-        #         remove_index_list.append(touple[0])
-        #         remove_index_list.append(touple[1])
-        #     elif range_string[touple[1]+1] == ",": # remove if first is on position 0 and second follows, 
-        #         remove_index_list.append(touple[0])
-        #         remove_index_list.append(touple[1])
-                
-        # possible to add additional stuff here (remove if there are only , before after etc) FIXME?
+        # If another pair is strictly nested within it, the outer pair is redundant.
+        if any(inner for inner in index_touple_list if inner[0] > touple[0] and inner[1] < touple[1]):
+            remove_index_list.extend([touple[0], touple[1]])
+        # Empty brackets
+        if touple[1] - touple[0] == 1:
+            remove_index_list.extend([touple[0], touple[1]])
+        # Parentheses covering the entire string
+        if (touple[0] == 0) and (touple[1] == len(range_string) - 1):
+            remove_index_list.extend([touple[0], touple[1]])
 
-#    print(index_touple_list)
-    return_string=''
-    for index in range(len(range_string)): # deleting parenthesis
-        if index not in remove_index_list:
-            return_string+=range_string[index]       
-    return return_string
-    
-def test():
-    hand_string="$4B2:(Jss+,9K+)"
-    board_string="Ks3s3s6h7d"
-    sample_board=parse_board(board_string)
-    #print(hand_string)
-    print(parse_hand(hand_string,board_string))
-    print("50%:(((A,4,5):(34,ss)))()")
-    print(remove_parentheses("50%:(((A,4,5):(34,ss)))()"))
-
-if __name__ == '__main__':
-    import timeit
-    if DEBUG:
-        test()
+    # Reconstruct the string without the parenthesis indices to be deleted
+    return ''.join(
+        range_string[i] for i in range(len(range_string))
+        if i not in remove_index_list
+    )
 
 
 
-# 
+#
 # hand.py ends here
